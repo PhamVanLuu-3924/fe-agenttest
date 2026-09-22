@@ -9,7 +9,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="vi">
-      <body>{children}</body>
+      <body>
+        {children}
+        <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async />
+      </body>
     </html>
   );
 }
