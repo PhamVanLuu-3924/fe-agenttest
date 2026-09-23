@@ -60,6 +60,13 @@ function getGroupTitle(prompt: string) {
   return "Nhóm điều tra và phân tích";
 }
 
+function getGroupMemberState(group: AgentGroup, id: AgentId): "queued" | "working" | "done" {
+  if (group.phase === "complete") return "done";
+  if (group.phase === "receiving") return "working";
+  if (group.phase === "thinking") return id === "data" ? "working" : "queued";
+  return id === "data" ? "done" : "working";
+}
+
 const initialMessages: Record<AgentId, Message[]> = {
   orchestrator: [
     { id: "o1", kind: "system", text: "Hôm nay, 09:32" },
@@ -93,13 +100,6 @@ function CollaborationGroup({ group, onAgent }: { group: AgentGroup; onAgent: (i
   const isWorking = group.phase !== "complete";
   const phaseLabel = group.phase === "receiving" ? "Đang nhận yêu cầu" : group.phase === "thinking" ? "Đang lập kế hoạch" : group.phase === "collaborating" ? "Đang phối hợp" : "Đã hoàn tất";
 
-  function memberState(id: AgentId) {
-    if (group.phase === "complete") return "done";
-    if (group.phase === "receiving") return "queued";
-    if (group.phase === "thinking") return id === "data" ? "working" : "queued";
-    return id === "data" ? "done" : "working";
-  }
-
   return <section className={`collaboration-group collaboration-group--${group.phase}`} aria-label={`${group.title}: ${members.map((member) => member.name).join(", ")}`}>
     <div className="collaboration-head">
       <div className="group-avatar-stack" aria-hidden="true">{members.slice(0, 5).map((member) => <span key={member.id}><AgentMark agent={member} size="sm" /></span>)}</div>
@@ -108,7 +108,7 @@ function CollaborationGroup({ group, onAgent }: { group: AgentGroup; onAgent: (i
     </div>
     <div className="group-prompt"><Sparkles /><span><small>NHIỆM VỤ CHUNG</small>{group.prompt}</span></div>
     <div className="group-members">{members.map((member) => {
-      const state = memberState(member.id);
+      const state = getGroupMemberState(group, member.id);
       return <button key={member.id} type="button" onClick={() => onAgent(member.id)} disabled={isWorking} className={`group-member group-member--${state}`}>
         <AgentMark agent={member} size="sm" />
         <span><strong>{member.name}</strong><small>{state === "done" ? "Đã bàn giao" : state === "working" ? "Đang suy nghĩ" : "Đang chờ dữ liệu"}</small></span>
@@ -116,6 +116,20 @@ function CollaborationGroup({ group, onAgent }: { group: AgentGroup; onAgent: (i
       </button>;
     })}</div>
     <div className="group-flow" aria-hidden="true"><span className={group.phase !== "receiving" ? "is-active" : ""}>Dữ liệu</span><i /><span className={group.phase === "collaborating" || group.phase === "complete" ? "is-active" : ""}>Phân tích song song</span><i /><span className={group.phase === "complete" ? "is-active" : ""}>Hợp nhất kết quả</span></div>
+  </section>;
+}
+
+function SidebarAgentGroup({ group, onAgent }: { group: AgentGroup; onAgent: (id: AgentId) => void }) {
+  const members = group.memberIds.map((id) => agents.find((agent) => agent.id === id)).filter((agent): agent is Agent => Boolean(agent));
+  const isWorking = group.phase !== "complete";
+  return <section className={`sidebar-agent-group sidebar-agent-group--${group.phase}`} aria-label={`Nhóm hiện tại: ${members.map((member) => member.name).join(", ")}`}>
+    <div className="sidebar-group-head"><span><Users /></span><div><small>NHÓM ĐANG LÀM VIỆC</small><strong>{group.title}</strong></div>{isWorking ? <BouncingDots label="Nhóm agent đang làm việc" /> : <Check />}</div>
+    <div className="sidebar-group-members">{members.map((member) => {
+      const state = getGroupMemberState(group, member.id);
+      return <button key={member.id} type="button" onClick={() => onAgent(member.id)} disabled={isWorking} title={`${member.name} · ${state === "working" ? "Đang làm việc" : state === "done" ? "Đã hoàn tất" : "Đang chờ"}`}>
+        <AgentMark agent={member} size="sm" /><span>{member.name}</span>{state === "working" ? <BouncingDots label={`${member.name} đang làm việc`} /> : state === "done" ? <Check /> : <Clock3 />}
+      </button>;
+    })}</div>
   </section>;
 }
 
@@ -401,7 +415,12 @@ export function ChatWorkspace({ previewAgent }: { previewAgent?: AgentId } = {})
     <aside className={`sidebar ${sidebarOpen ? "sidebar--open" : ""}`}>
       <div className="window-row"><div className="traffic-lights" aria-hidden="true"><span /><span /><span /></div><button className="icon-button new-chat" aria-label="Tạo cuộc trò chuyện mới" onClick={newConversation}><Plus /></button><button className="icon-button mobile-close" aria-label="Đóng menu" onClick={() => setSidebarOpen(false)}><X /></button></div>
       <label className="search-box"><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm agent hoặc phân tích" /><kbd>⌘K</kbd></label>
-      <nav className="agent-list" aria-label="Danh sách agent">{filteredAgents.map((agent) => <button key={agent.id} className={`agent-item ${activeId === agent.id ? "agent-item--active" : ""}`} onClick={() => chooseAgent(agent.id)}><AgentMark agent={agent} /><span className="agent-copy"><span className="agent-title"><strong>{agent.name}</strong><time>{agent.time}</time></span><span className="agent-role">{agent.role}</span><span className="agent-preview">{agent.preview}</span></span>{agent.unread && <span className="unread-dot" />}</button>)}</nav>
+      {activeGroup && <SidebarAgentGroup group={activeGroup} onAgent={chooseAgent} />}
+      <nav className="agent-list" aria-label="Danh sách agent">{filteredAgents.map((agent) => {
+        const groupState = activeGroup?.memberIds.includes(agent.id) ? getGroupMemberState(activeGroup, agent.id) : null;
+        const isAgentWorking = groupState === "working";
+        return <button key={agent.id} className={`agent-item ${activeId === agent.id ? "agent-item--active" : ""} ${isAgentWorking ? "agent-item--working" : ""}`} onClick={() => chooseAgent(agent.id)}><AgentMark agent={agent} /><span className="agent-copy"><span className="agent-title"><strong>{agent.name}</strong>{isAgentWorking ? <BouncingDots label={`${agent.name} đang làm việc`} /> : <time>{agent.time}</time>}</span><span className="agent-role">{agent.role}{groupState && <em>{groupState === "working" ? "Đang làm việc" : groupState === "done" ? "Đã hoàn tất" : "Đang chờ"}</em>}</span><span className="agent-preview">{agent.preview}</span></span>{agent.unread && !isAgentWorking && <span className="unread-dot" />}</button>;
+      })}</nav>
       <div className="profile-row"><span className="avatar">{user.name.split(" ").slice(-2).map((part) => part[0]).join("")}</span><span><strong>{user.name}</strong><small>{user.role} · {user.staffId}</small></span><button className="icon-button" aria-label="Đăng xuất" onClick={logout}><LogOut /></button></div>
     </aside>
 
