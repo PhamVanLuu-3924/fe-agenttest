@@ -1,5 +1,5 @@
-import { ChatWorkspace } from "@/components/chat-workspace";
+import { SessionGate } from "@/app/session-gate";
 
 export default function Home() {
-  return <ChatWorkspace />;
+  return <SessionGate />;
 }
