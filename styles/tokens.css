@@ -1,0 +1,16 @@
+:root {
+  --ink: #161719;
+  --muted: #7a7d83;
+  --line: #e7e7e5;
+  --surface: #ffffff;
+  --soft: #f5f5f3;
+  --warm: #f9f8f5;
+  --accent: #ef8354;
+  --success: #10a985;
+  --warning: #e9a23b;
+  --danger: #d85252;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --shadow-shell: 0 18px 60px rgba(24, 24, 18, 0.08);
+}
