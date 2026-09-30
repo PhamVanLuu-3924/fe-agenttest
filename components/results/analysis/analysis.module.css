@@ -1,0 +1,641 @@
+.analysisRoot {
+  --token-bg-surface: var(--vd-bg-surface, var(--surface, #ffffff));
+  --token-bg-subtle: var(--vd-bg-subtle, var(--soft, #f1f5f9));
+  --token-text-primary: var(--vd-text-primary, var(--ink, #23262d));
+  --token-text-secondary: var(--vd-text-secondary, var(--muted, #475569));
+  --token-border-default: var(--vd-border-default, var(--line, #e2e8f0));
+  --token-brand: var(--vd-brand, #2563eb);
+  --token-success: var(--vd-success, var(--success, #16a34a));
+  --token-warning: var(--vd-warning, var(--warning, #d97706));
+  --token-danger: var(--vd-danger, var(--danger, #dc2626));
+  --token-radius-sm: var(--vd-radius-sm, var(--radius-sm, 8px));
+  --token-radius-md: var(--vd-radius-md, var(--radius-md, 12px));
+  --token-radius-lg: var(--vd-radius-lg, var(--radius-lg, 16px));
+
+  margin: 14px 0;
+  padding: 16px;
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--token-radius-lg);
+  background: var(--token-bg-surface);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Header */
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.titleGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cardTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--token-text-primary);
+  margin: 0;
+}
+
+.peerBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  color: var(--token-brand);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+/* 4 Metric Cards Grid */
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+/* Chart Slot */
+.chartSlotContainer {
+  margin: 14px 0;
+  border: 1px dashed var(--token-border-default);
+  border-radius: var(--token-radius-md);
+  padding: 14px;
+  background: #fafaf8;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+.chartPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--token-text-secondary);
+}
+
+.chartVisualProxy {
+  height: 110px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f4f4f0;
+  border-radius: var(--token-radius-sm);
+  color: var(--token-text-secondary);
+  font-size: 10px;
+  text-align: center;
+  padding: 0 12px;
+}
+
+/* Warning & Limits Callout */
+.warningCallout {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 14px 0;
+  padding: 10px 12px;
+  border-radius: var(--token-radius-md);
+  background: rgba(217, 119, 6, 0.08);
+  border: 1px solid rgba(217, 119, 6, 0.25);
+  color: var(--token-warning);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.warningContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.warningTitle {
+  font-weight: 700;
+  color: var(--token-text-primary);
+}
+
+.limitsButton {
+  margin-top: 4px;
+  align-self: flex-start;
+  padding: 4px 8px;
+  border-radius: var(--token-radius-sm);
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  background: var(--token-bg-surface);
+  color: var(--token-warning);
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.limitsButton:hover {
+  background: rgba(217, 119, 6, 0.15);
+}
+
+.limitsButton:focus-visible {
+  outline: 2px solid var(--token-warning);
+  outline-offset: 1px;
+}
+
+/* Source text footer */
+.sourceFooter {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--token-border-default);
+  color: var(--token-text-secondary);
+  font-size: 9px;
+  opacity: 0.85;
+}
+
+/* Peer Table with Horizontal Scroll Protection */
+.tableSection {
+  margin-top: 14px;
+}
+
+.sectionHeading {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--token-text-primary);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tableWrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--token-radius-md);
+  margin-bottom: 12px;
+}
+
+.peerTable {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+  font-size: 10px;
+  text-align: left;
+}
+
+.peerTable th {
+  padding: 8px 10px;
+  background: var(--token-bg-subtle);
+  color: var(--token-text-secondary);
+  font-weight: 600;
+  border-bottom: 1px solid var(--token-border-default);
+  white-space: nowrap;
+}
+
+.peerTable td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--token-border-default);
+  color: var(--token-text-primary);
+}
+
+.peerTable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.peerTable tbody tr:hover {
+  background: #fafaf8;
+}
+
+/* Similarity Pill */
+.similarityPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(139, 92, 246, 0.1);
+  color: #7c3aed;
+  font-weight: 700;
+  font-size: 9px;
+}
+
+/* Benchmark Conclusion Callout */
+.benchmarkCallout {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--token-radius-md);
+  background: rgba(37, 99, 235, 0.06);
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  color: var(--token-text-primary);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.benchmarkCallout strong {
+  color: var(--token-brand);
+  flex-shrink: 0;
+}
+
+/* ---------------- Trạng thái: Không đủ Peer ---------------- */
+.insufficientBanner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: var(--token-radius-md);
+  background: rgba(217, 119, 6, 0.08);
+  border: 1px solid rgba(217, 119, 6, 0.3);
+  margin-bottom: 14px;
+}
+
+.insufficientHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--token-warning);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.insufficientDesc {
+  font-size: 11px;
+  color: var(--token-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.lockedBenchmarkNotice {
+  padding: 14px;
+  text-align: center;
+  border: 1px dashed rgba(217, 119, 6, 0.35);
+  border-radius: var(--token-radius-md);
+  background: #fffcf5;
+  color: var(--token-warning);
+  font-size: 10px;
+  font-weight: 600;
+  margin: 12px 0;
+}
+
+/* ---------------- Trạng thái: Partial Response ---------------- */
+.partialContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.partialScopeChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.chipAvailable {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(22, 163, 74, 0.1);
+  border: 1px solid rgba(22, 163, 74, 0.3);
+  color: var(--token-success);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.chipMissing {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(217, 119, 6, 0.1);
+  border: 1px solid rgba(217, 119, 6, 0.3);
+  color: var(--token-warning);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.safetyCommitment {
+  padding: 8px 12px;
+  border-radius: var(--token-radius-sm);
+  background: var(--token-bg-subtle);
+  border-left: 3px solid var(--token-brand);
+  font-size: 9px;
+  color: var(--token-text-secondary);
+}
+
+/* ---------------- Trạng thái: Failed ---------------- */
+.failedContainer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--token-radius-md);
+  background: rgba(220, 38, 38, 0.06);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  color: var(--token-danger);
+}
+
+.failedDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.failedTitle {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.failedDesc {
+  font-size: 10px;
+  color: var(--token-text-secondary);
+  margin: 0;
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 900px) {
+  .metricsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .metricsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .analysisRoot {
+    padding: 12px;
+  }
+}
+
+/* ==================== INSIGHT RESULT STYLES ==================== */
+.summaryHighlight {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: var(--token-radius-md);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.05) 0%, rgba(241, 245, 249, 0.6) 100%);
+  border-left: 3px solid var(--token-brand);
+  color: var(--token-text-primary);
+  font-size: 11px;
+  line-height: 1.55;
+  font-weight: 550;
+}
+
+.insightList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.insightCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--token-radius-md);
+  background: #ffffff;
+  transition: all 0.16s ease;
+}
+
+.insightCard:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.03);
+}
+
+.insightHeadRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.insightTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.insightOrder {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--token-bg-subtle);
+  color: var(--token-text-secondary);
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.insightTitle {
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--token-text-primary);
+  margin: 0;
+}
+
+/* Confidence Text Badges (chữ rõ ràng, không chỉ bằng màu) */
+.confidenceBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.confidenceHigh {
+  background: rgba(22, 163, 74, 0.1);
+  border: 1px solid rgba(22, 163, 74, 0.25);
+  color: var(--token-success);
+}
+
+.confidenceMedium {
+  background: rgba(217, 119, 6, 0.1);
+  border: 1px solid rgba(217, 119, 6, 0.25);
+  color: var(--token-warning);
+}
+
+.confidenceLow {
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  color: var(--token-danger);
+}
+
+.insightDescription {
+  font-size: 10px;
+  color: var(--token-text-secondary);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.insightFootRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--token-border-default);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Evidence Reference Button (Bấm được, callback qua props, không tự điều hướng) */
+.evidenceButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: var(--token-radius-sm);
+  background: var(--token-bg-subtle);
+  border: 1px solid var(--token-border-default);
+  color: var(--token-text-primary);
+  font-size: 9px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.evidenceButton:hover {
+  background: #ffffff;
+  border-color: var(--token-brand);
+  color: var(--token-brand);
+}
+
+.evidenceButton:focus-visible {
+  outline: 2px solid var(--token-brand);
+  outline-offset: 1px;
+}
+
+/* Limitation Callout - Luôn hiển thị */
+.limitationAlwaysVisible {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 14px 0;
+  padding: 12px 14px;
+  border-radius: var(--token-radius-md);
+  background: rgba(217, 119, 6, 0.07);
+  border: 1px solid rgba(217, 119, 6, 0.25);
+  color: var(--token-warning);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.limitationHeader {
+  font-weight: 700;
+  color: var(--token-text-primary);
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+
+/* ================= RESPONSIVE ADJUSTMENTS ================= */
+
+/* Tablet (768px) */
+@media (max-width: 768px) {
+  .analysisRoot {
+    padding: 12px;
+    margin: 10px 0;
+  }
+
+  .metricsGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .cardHeader {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .chartVisualProxy {
+    height: 90px;
+    font-size: 9px;
+    padding: 0 8px;
+  }
+
+  .failedContainer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
+/* Mobile (375px - 480px) */
+@media (max-width: 480px) {
+  .analysisRoot {
+    padding: 10px;
+    margin: 8px 0;
+    border-radius: var(--token-radius-md);
+  }
+
+  .cardTitle {
+    font-size: 12px;
+  }
+
+  .metricsGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  .chartPlaceholder {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+  }
+
+  .chartVisualProxy {
+    height: 80px;
+    font-size: 9px;
+  }
+
+  .insightHeadRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .insightTitle {
+    font-size: 11px;
+  }
+
+  .insightFootRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .evidenceButton {
+    width: 100%;
+    justify-content: flex-start;
+    box-sizing: border-box;
+  }
+
+  .limitationAlwaysVisible {
+    padding: 10px;
+    font-size: 9.5px;
+  }
+
+  .warningCallout {
+    padding: 8px 10px;
+  }
+}
+
+
