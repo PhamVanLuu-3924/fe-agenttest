@@ -26,7 +26,27 @@ export type Message = {
 
 export type UserProfile = { name: string; email: string; staffId: string; role: string };
 export type ShortTermHistory = { id: string; agentId: AgentId; prompt: string; project: string; time: string };
-export type WorkPhase = "idle" | "receiving" | "thinking" | "collaborating" | "complete";
-export type AgentGroup = { id: string; title: string; prompt: string; memberIds: AgentId[]; phase: Exclude<WorkPhase, "idle"> };
+export type RunPhase = "idle" | "receiving" | "thinking" | "collaborating" | "complete" | "partial" | "failed" | "retrying" | "cancelling" | "cancelled";
+export type WorkPhase = RunPhase;
+export type RunTaskState = "queued" | "running" | "success" | "failed" | "skipped";
+export type RunTask = {
+  id: string;
+  agentId: AgentId;
+  title: string;
+  detail: string;
+  state: RunTaskState;
+};
+export type AgentRun = {
+  id: string;
+  title: string;
+  prompt: string;
+  projectId: string;
+  startedAt: string;
+  phase: RunPhase;
+  tasks: RunTask[];
+  pendingReviewCount?: number;
+  error?: string;
+};
+export type AgentGroup = { id: string; title: string; prompt: string; memberIds: AgentId[]; phase: Exclude<RunPhase, "idle"> };
 export type AgentGuide = { purpose: string; needs: string; outputs: readonly string[]; prompts: readonly string[] };
 export type ConversationHistoryItem = { id: string; title: string; detail: string; time: string };
