@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "@/styles/luu-shell.css";
 
 export const metadata: Metadata = {
   title: "VDAgent — Phân tích bất động sản",
