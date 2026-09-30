@@ -6,7 +6,7 @@ import {
   projects,
 } from "@/data/mock-real-estate";
 import type { WorkspaceRepository } from "@/repositories/workspace-repository";
-import type { Agent, AgentGroup, AgentGuide, AgentId, ConversationHistoryItem, Message } from "@/types/workspace";
+import type { Agent, AgentGroup, AgentGuide, AgentId, AgentRun, ConversationHistoryItem, Message, RunPhase, RunTaskState } from "@/types/workspace";
 
 export const mockAgents: Agent[] = [
   { id: "orchestrator", name: "Điều phối", role: "Orchestrator", time: "09:42", preview: "Đã hoàn tất phân tích giỏ hàng Q2.", color: "#ef8354", icon: Sparkles },
@@ -22,7 +22,59 @@ export const defaultCollaborationGroup: AgentGroup = {
   title: "Nhóm điều tra căn bán chậm",
   prompt: "Phân tích căn bán chậm và các yếu tố liên quan",
   memberIds: ["data", "compare", "insight", "chart", "report"],
-  phase: "complete",
+  phase: "partial",
+};
+
+const runTasks: AgentRun["tasks"] = [
+  { id: "task-data", agentId: "data", title: "Kiểm tra dữ liệu", detail: "1.248 bản ghi · DQ 98,7%", state: "success" },
+  { id: "task-compare", agentId: "compare", title: "Đối chuẩn peer group", detail: "5 nhóm tương đồng", state: "success" },
+  { id: "task-insight", agentId: "insight", title: "Tổng hợp insight", detail: "3 bằng chứng đã liên kết", state: "success" },
+  { id: "task-chart", agentId: "chart", title: "Dựng biểu đồ", detail: "4 biểu đồ có thể truy vết", state: "success" },
+  { id: "task-report", agentId: "report", title: "Hoàn thiện báo cáo", detail: "Chờ bạn duyệt 2 claim", state: "queued" },
+];
+
+const taskStates: Record<Exclude<RunPhase, "idle">, RunTaskState[]> = {
+  receiving: ["queued", "queued", "queued", "queued", "queued"],
+  thinking: ["running", "queued", "queued", "queued", "queued"],
+  collaborating: ["success", "running", "running", "running", "queued"],
+  complete: ["success", "success", "success", "success", "success"],
+  partial: ["success", "success", "success", "success", "queued"],
+  failed: ["success", "failed", "skipped", "skipped", "skipped"],
+  retrying: ["success", "running", "queued", "queued", "queued"],
+  cancelling: ["success", "running", "queued", "queued", "queued"],
+  cancelled: ["success", "skipped", "skipped", "skipped", "skipped"],
+};
+
+function makeRunFixture(phase: Exclude<RunPhase, "idle">, overrides: Partial<AgentRun> = {}): AgentRun {
+  const tasks = runTasks.map((task, index) => {
+    const detail = phase === "failed" && index === 1 ? "Không thể hoàn tất bước đối chuẩn" : phase === "retrying" && index === 1 ? "Đang thử lại với dữ liệu đã lưu" : task.detail;
+    return { ...task, state: taskStates[phase][index], detail };
+  });
+  return {
+    id: `run-${phase}`,
+    title: "Căn bán chậm · Q2/2026",
+    prompt: "Phân tích căn bán chậm và các yếu tố liên quan",
+    projectId: "green-avenue",
+    startedAt: "09:33",
+    phase,
+    tasks,
+    pendingReviewCount: phase === "partial" ? 2 : 0,
+    error: phase === "failed" ? "Một agent chưa thể hoàn tất; dữ liệu đã xử lý vẫn được giữ lại." : undefined,
+    ...overrides,
+  };
+}
+
+/** Fixtures cover every state without requiring API or SSE. */
+export const mockRunFixtures: Record<Exclude<RunPhase, "idle">, AgentRun> = {
+  receiving: makeRunFixture("receiving"),
+  thinking: makeRunFixture("thinking"),
+  collaborating: makeRunFixture("collaborating"),
+  partial: makeRunFixture("partial", { id: "run-024" }),
+  complete: makeRunFixture("complete"),
+  failed: makeRunFixture("failed"),
+  retrying: makeRunFixture("retrying"),
+  cancelling: makeRunFixture("cancelling"),
+  cancelled: makeRunFixture("cancelled"),
 };
 
 const initialMessages: Record<AgentId, Message[]> = {
@@ -66,6 +118,7 @@ export const mockWorkspaceRepository: WorkspaceRepository = {
   getInitialMessages: () => Object.fromEntries(
     Object.entries(initialMessages).map(([key, messages]) => [key, messages.map((message) => ({ ...message }))]),
   ) as Record<AgentId, Message[]>,
+  getInitialRuns: () => ({ orchestrator: { ...mockRunFixtures.partial, tasks: mockRunFixtures.partial.tasks.map((task) => ({ ...task })) } }),
   getConversationHistory: () => conversationHistory,
   getProjectUnits,
   getAreaMetrics,
