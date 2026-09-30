@@ -1,149 +1,36 @@
 "use client";
 
 import {
-  ArrowRight, ArrowUp, BarChart3, ChartNoAxesCombined, Check, ChevronDown, Clock3,
-  Database, FileCheck2, FileText, History, Lightbulb, LogOut, Menu, Mic, Plus,
-  Search, ShieldCheck, Sparkles, Users, X,
+  BarChart3, Check, Clock3, Database, FileCheck2, FileText,
+  Lightbulb, ShieldCheck, Users,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import type { ElementType } from "react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { agentGuides, conversationHistory, getAreaMetrics, getProjectUnits, getSlowMovingUnits, projects } from "@/data/mock-real-estate";
+import { ConversationStream } from "@/components/conversation/conversation-stream";
+import { HistoryPanel } from "@/components/conversation/history-panel";
+import { PromptComposer } from "@/components/conversation/prompt-composer";
+import { WorkspaceSidebar } from "@/components/layout/workspace-sidebar";
+import { WorkspaceTopbar } from "@/components/layout/workspace-topbar";
+import { OrchestratorResult } from "@/components/run/orchestrator-result";
+import { RunProgressPanel } from "@/components/run/run-progress-panel";
+import { createRun, getGroupMemberState, getGroupTitle, selectCollaborationAgents, setRunPhase } from "@/components/run/run-state";
+import { SidebarAgentGroup } from "@/components/run/sidebar-agent-group";
+import { AgentMark } from "@/components/shared/agent-mark";
+import { MetricCard } from "@/components/shared/metric-card";
+import { mockWorkspaceRepository } from "@/mocks/workspace-repository";
+import type { AgentGroup, AgentId, AgentRun, Message, RunPhase, ShortTermHistory, UserProfile, WorkPhase } from "@/types/workspace";
+import styles from "./chat-workspace.module.css";
 
-type AgentId = keyof typeof agentGuides;
-type Agent = { id: AgentId; name: string; role: string; time: string; preview: string; color: string; icon: ElementType; unread?: boolean };
-type Message = { id: string; kind: "user" | "agent" | "system"; text: string; author?: string; time?: string; evidence?: string; artifact?: AgentId; artifactPrompt?: string };
-type UserProfile = { name: string; email: string; staffId: string; role: string };
-type ShortTermHistory = { id: string; agentId: AgentId; prompt: string; project: string; time: string };
-type WorkPhase = "idle" | "receiving" | "thinking" | "collaborating" | "complete";
-type AgentGroup = { id: string; title: string; prompt: string; memberIds: AgentId[]; phase: Exclude<WorkPhase, "idle"> };
+const repository = mockWorkspaceRepository;
+const agents = repository.getAgents();
+const projects = repository.getProjects();
+const conversationHistory = repository.getConversationHistory();
+const getProjectUnits = repository.getProjectUnits;
+const getAreaMetrics = repository.getAreaMetrics;
+const getSlowMovingUnits = repository.getSlowMovingUnits;
 
-const agents: Agent[] = [
-  { id: "orchestrator", name: "Điều phối", role: "Orchestrator", time: "09:42", preview: "Đã hoàn tất phân tích giỏ hàng Q2.", color: "#ef8354", icon: Sparkles },
-  { id: "data", name: "Dữ liệu", role: "Data Agent", time: "09:40", preview: "Đã kiểm tra 1.248 bản ghi.", color: "#3e8bff", icon: Database },
-  { id: "compare", name: "So sánh", role: "Compare Agent", time: "09:38", preview: "Tìm thấy 3 nhóm tương đồng.", color: "#8b5cf6", icon: Users },
-  { id: "insight", name: "Insight", role: "Insight Agent", time: "09:35", preview: "2 nhận định cần bạn xem lại.", color: "#10a985", icon: Lightbulb, unread: true },
-  { id: "chart", name: "Biểu đồ", role: "Chart Agent", time: "09:31", preview: "Đã tạo 4 biểu đồ bằng chứng.", color: "#e9a23b", icon: BarChart3 },
-  { id: "report", name: "Báo cáo", role: "Report Agent", time: "09:28", preview: "Bản nháp v1 sẵn sàng duyệt.", color: "#ec5c8d", icon: FileText },
-];
-
-const defaultCollaborationGroup: AgentGroup = {
-  id: "group-slow-moving-q2",
-  title: "Nhóm điều tra căn bán chậm",
-  prompt: "Phân tích căn bán chậm và các yếu tố liên quan",
-  memberIds: ["data", "compare", "insight", "chart", "report"],
-  phase: "complete",
-};
-
-function selectCollaborationAgents(prompt: string, primary: AgentId): AgentId[] {
-  const normalized = prompt.toLocaleLowerCase("vi-VN");
-  const selected = new Set<AgentId>();
-  const has = (...terms: string[]) => terms.some((term) => normalized.includes(term));
-
-  if (primary !== "orchestrator") selected.add(primary);
-  selected.add("data");
-  if (primary === "compare" || has("so sánh", "peer", "benchmark", "tương đồng", "bán chậm")) selected.add("compare");
-  if (primary === "insight" || has("tại sao", "nguyên nhân", "insight", "bất thường", "bán chậm")) selected.add("insight");
-  if (primary === "chart" || has("biểu đồ", "trực quan", "dashboard", "xu hướng", "bán chậm")) selected.add("chart");
-  if (primary === "report" || has("báo cáo", "tóm tắt", "manager", "pdf", "xuất")) selected.add("report");
-  if (primary === "orchestrator" && selected.size === 1) selected.add("insight");
-
-  return agents.filter((agent) => agent.id !== "orchestrator" && selected.has(agent.id)).map((agent) => agent.id);
-}
-
-function getGroupTitle(prompt: string) {
-  const normalized = prompt.toLocaleLowerCase("vi-VN");
-  if (normalized.includes("báo cáo") || normalized.includes("manager")) return "Nhóm tạo báo cáo có bằng chứng";
-  if (normalized.includes("so sánh") || normalized.includes("peer")) return "Nhóm so sánh và đối chuẩn";
-  if (normalized.includes("biểu đồ") || normalized.includes("trực quan")) return "Nhóm phân tích và trực quan hóa";
-  if (normalized.includes("chất lượng") || normalized.includes("thiếu")) return "Nhóm kiểm tra chất lượng dữ liệu";
-  return "Nhóm điều tra và phân tích";
-}
-
-function getGroupMemberState(group: AgentGroup, id: AgentId): "queued" | "working" | "done" {
-  if (group.phase === "complete") return "done";
-  if (group.phase === "receiving") return "working";
-  if (group.phase === "thinking") return id === "data" ? "working" : "queued";
-  return id === "data" ? "done" : "working";
-}
-
-const initialMessages: Record<AgentId, Message[]> = {
-  orchestrator: [
-    { id: "o1", kind: "system", text: "Hôm nay, 09:32" },
-    { id: "o2", kind: "user", text: "Phân tích các căn bán chậm tại dự án Green Avenue trong quý 2 và cho tôi biết nguyên nhân đáng chú ý.", time: "09:32" },
-    { id: "o3", kind: "agent", author: "Điều phối", text: "Tôi đã chia yêu cầu thành 4 bước: kiểm tra dữ liệu, xác định căn bán chậm, so sánh peer group và tổng hợp bằng chứng. 5 agent chuyên môn đang phối hợp.", time: "09:33" },
-    { id: "o4", kind: "system", text: "Dữ liệu và So sánh đã hoàn tất" },
-    { id: "o5", kind: "agent", author: "Dữ liệu", text: "Đã đối soát 1.248 căn thuộc snapshot Q2/2026. Có 31 căn vượt ngưỡng DOM 90 ngày; 2 bản ghi thiếu lịch sử giá được đánh dấu PARTIAL.", time: "09:36", evidence: "Snapshot GA-Q2-2026 · DQ 98,7%" },
-    { id: "o6", kind: "agent", author: "So sánh", text: "Phân khu Riverside có tốc độ hấp thụ thấp hơn peer group 14,2 điểm %. Chênh lệch tập trung ở nhóm căn 2PN, diện tích 68–74 m².", time: "09:38", evidence: "5 peers · tolerance ±10% · công thức v1.2" },
-    { id: "o7", kind: "agent", author: "Insight", text: "Giá chào bán mỗi m² cao hơn trung vị nhóm tương đồng 8,6%, trong khi ưu đãi thanh toán thấp hơn 2 điểm %. Đây là yếu tố liên quan mạnh nhất, chưa đủ để kết luận nhân quả.", time: "09:40", evidence: "INS-024 · 3 bằng chứng đã liên kết" },
-    { id: "o8", kind: "agent", author: "Điều phối", text: "Kết quả đã sẵn sàng. Tôi đã hợp nhất đầu ra của 5 agent thành một run có thể truy vết; các dòng thiếu dữ liệu được giữ ngoài kết luận chính để bạn review.", time: "09:42", artifact: "orchestrator" },
-  ],
-  data: [{ id: "d1", kind: "agent", author: "Dữ liệu", text: "Tôi đã chạy truy vấn mẫu trên snapshot. Kết quả bên dưới là dữ liệu có cấu trúc, có bộ lọc, metric và cờ chất lượng — không phải một đoạn trả lời chung chung.", time: "09:40", artifact: "data" }],
-  compare: [{ id: "c1", kind: "agent", author: "So sánh", text: "Tôi đã dựng peer group theo rule cùng loại căn, diện tích ±10%, cùng giai đoạn mở bán và tối thiểu 5 peers. Đây là bảng benchmark để bạn nhìn rõ chênh lệch.", time: "09:38", artifact: "compare" }],
-  insight: [{ id: "i1", kind: "agent", author: "Insight", text: "Tôi đã xếp hạng các tín hiệu theo mức độ quan trọng, liên kết evidence và ghi rõ giới hạn. Kết quả không đánh đồng tương quan với nguyên nhân.", time: "09:35", artifact: "insight" }],
-  chart: [{ id: "ch1", kind: "agent", author: "Biểu đồ", text: "Tôi đã dựng biểu đồ DOM có trục đo, đường lưới, ngưỡng cảnh báo, nhãn số và cỡ mẫu. Mỗi cột vẫn liên kết về dữ liệu nguồn.", time: "09:31", artifact: "chart" }],
-  report: [{ id: "r1", kind: "agent", author: "Báo cáo", text: "Tôi đã ghép metric, insight, biểu đồ và evidence thành bản nháp 6 phần đúng đối tượng Sales Manager, kèm các claim còn cần người dùng duyệt.", time: "09:28", artifact: "report" }],
-};
-
-function AgentMark({ agent, size = "md" }: { agent: Agent; size?: "sm" | "md" }) {
-  const Icon = agent.icon;
-  if (agent.id === "orchestrator") return <span className={`agent-mark orchestrator-mark ${size === "sm" ? "agent-mark--sm" : ""}`} aria-label="Điều phối 5 agent chuyên môn"><Sparkles className="orchestrator-core" /><i className="agent-satellite satellite-data"><Database /></i><i className="agent-satellite satellite-compare"><Users /></i><i className="agent-satellite satellite-insight"><Lightbulb /></i><i className="agent-satellite satellite-chart"><BarChart3 /></i><i className="agent-satellite satellite-report"><FileText /></i></span>;
-  return <span className={`agent-mark ${size === "sm" ? "agent-mark--sm" : ""}`} style={{ backgroundColor: agent.color }}><Icon aria-hidden="true" strokeWidth={2.2} /></span>;
-}
-
-function BouncingDots({ label = "Đang xử lý" }: { label?: string }) {
-  return <span className="bouncing-dots" role="status" aria-label={label}><i /><i /><i /></span>;
-}
-
-function CollaborationGroup({ group, onAgent }: { group: AgentGroup; onAgent: (id: AgentId) => void }) {
-  const members = group.memberIds.map((id) => agents.find((agent) => agent.id === id)).filter((agent): agent is Agent => Boolean(agent));
-  const isWorking = group.phase !== "complete";
-  const phaseLabel = group.phase === "receiving" ? "Đang nhận yêu cầu" : group.phase === "thinking" ? "Đang lập kế hoạch" : group.phase === "collaborating" ? "Đang phối hợp" : "Đã hoàn tất";
-
-  return <section className={`collaboration-group collaboration-group--${group.phase}`} aria-label={`${group.title}: ${members.map((member) => member.name).join(", ")}`}>
-    <div className="collaboration-head">
-      <div className="group-avatar-stack" aria-hidden="true">{members.slice(0, 5).map((member) => <span key={member.id}><AgentMark agent={member} size="sm" /></span>)}</div>
-      <div className="group-heading"><small>NHÓM AGENT ĐƯỢC TẠO TỰ ĐỘNG</small><strong>{group.title}</strong><p>{members.map((member) => member.name).join(" · ")}</p></div>
-      <span className={`group-phase ${isWorking ? "group-phase--working" : ""}`}>{isWorking ? <BouncingDots label={phaseLabel} /> : <Check />} {phaseLabel}</span>
-    </div>
-    <div className="group-prompt"><Sparkles /><span><small>NHIỆM VỤ CHUNG</small>{group.prompt}</span></div>
-    <div className="group-members">{members.map((member) => {
-      const state = getGroupMemberState(group, member.id);
-      return <button key={member.id} type="button" onClick={() => onAgent(member.id)} disabled={isWorking} className={`group-member group-member--${state}`}>
-        <AgentMark agent={member} size="sm" />
-        <span><strong>{member.name}</strong><small>{state === "done" ? "Đã bàn giao" : state === "working" ? "Đang suy nghĩ" : "Đang chờ dữ liệu"}</small></span>
-        {state === "done" ? <Check /> : state === "working" ? <BouncingDots label={`${member.name} đang suy nghĩ`} /> : <Clock3 />}
-      </button>;
-    })}</div>
-    <div className="group-flow" aria-hidden="true"><span className={group.phase !== "receiving" ? "is-active" : ""}>Dữ liệu</span><i /><span className={group.phase === "collaborating" || group.phase === "complete" ? "is-active" : ""}>Phân tích song song</span><i /><span className={group.phase === "complete" ? "is-active" : ""}>Hợp nhất kết quả</span></div>
-  </section>;
-}
-
-function SidebarAgentGroup({ group, onAgent }: { group: AgentGroup; onAgent: (id: AgentId) => void }) {
-  const members = group.memberIds.map((id) => agents.find((agent) => agent.id === id)).filter((agent): agent is Agent => Boolean(agent));
-  const isWorking = group.phase !== "complete";
-  return <section className={`sidebar-agent-group sidebar-agent-group--${group.phase}`} aria-label={`Nhóm hiện tại: ${members.map((member) => member.name).join(", ")}`}>
-    <div className="sidebar-group-head"><span><Users /></span><div><small>NHÓM ĐANG LÀM VIỆC</small><strong>{group.title}</strong></div>{isWorking ? <BouncingDots label="Nhóm agent đang làm việc" /> : <Check />}</div>
-    <div className="sidebar-group-members">{members.map((member) => {
-      const state = getGroupMemberState(group, member.id);
-      return <button key={member.id} type="button" onClick={() => onAgent(member.id)} disabled={isWorking} title={`${member.name} · ${state === "working" ? "Đang làm việc" : state === "done" ? "Đã hoàn tất" : "Đang chờ"}`}>
-        <AgentMark agent={member} size="sm" /><span>{member.name}</span>{state === "working" ? <BouncingDots label={`${member.name} đang làm việc`} /> : state === "done" ? <Check /> : <Clock3 />}
-      </button>;
-    })}</div>
-  </section>;
-}
-
-function AgentGuide({ agent, onPrompt }: { agent: Agent; onPrompt: (prompt: string) => void }) {
-  const guide = agentGuides[agent.id];
-  return <section className="guide-card">
-    <div className="guide-heading"><AgentMark agent={agent} /><div><span>BẠN ĐANG LÀM VIỆC VỚI</span><h2>{agent.name}</h2><p>{guide.purpose}</p></div></div>
-    <div className="guide-columns"><div><small>BẠN CẦN CUNG CẤP</small><p>{guide.needs}</p></div><div><small>AGENT SẼ TRẢ VỀ</small><ul>{guide.outputs.map((item) => <li key={item}><Check /> {item}</li>)}</ul></div></div>
-    <div className="prompt-group"><small>CÂU HỎI GỢI Ý</small><div>{guide.prompts.map((prompt) => <button key={prompt} onClick={() => onPrompt(prompt)}>{prompt}<ArrowRight /></button>)}</div></div>
-  </section>;
-}
-
-function MetricCard({ label, value, detail, tone }: { label: string; value: string; detail: string; tone?: "warning" | "good" }) {
-  return <div className={`metric-card ${tone ? `metric-card--${tone}` : ""}`}><small>{label}</small><strong>{value}</strong><span>{detail}</span></div>;
+function createEmptyConversations(): Record<AgentId, Message[]> {
+  return { orchestrator: [], data: [], compare: [], insight: [], chart: [], report: [] };
 }
 
 function DomChart({ projectId }: { projectId: string }) {
@@ -184,7 +71,7 @@ function PriceDomChart({ projectId }: { projectId: string }) {
   return <div className="price-dom-chart"><div className="price-dom-head"><span>Phân khu</span><span>Giá/m²</span><span>DOM TB</span><span>Tín hiệu</span></div>{metrics.map((metric) => { const units = rows.filter((row) => row.area === metric.area); const dom = Math.round(units.reduce((sum, unit) => sum + unit.daysOnMarket, 0) / units.length); const price = (units.reduce((sum, unit) => sum + unit.pricePerSqm, 0) / units.length).toFixed(1); return <div key={metric.area}><strong>{metric.area}<small>{units.length} căn 2PN</small></strong><span>{price} tr</span><span>{dom} ngày</span><em className={dom > 90 ? "signal-danger" : "signal-good"}>{dom > 90 ? "Cần review" : "Ổn định"}</em></div>; })}</div>;
 }
 
-function AgentArtifact({ agentId, projectId, prompt = "", compact = false }: { agentId: AgentId; projectId: string; prompt?: string; compact?: boolean }) {
+function AgentArtifact({ agentId, projectId, prompt = "", compact = false, run }: { agentId: AgentId; projectId: string; prompt?: string; compact?: boolean; run?: AgentRun }) {
   const project = projects.find((item) => item.id === projectId) ?? projects[0];
   const rows = getProjectUnits(projectId);
   const slow = getSlowMovingUnits(projectId, compact ? 4 : 6);
@@ -198,18 +85,8 @@ function AgentArtifact({ agentId, projectId, prompt = "", compact = false }: { a
   const has = (...terms: string[]) => terms.some((term) => normalizedPrompt.includes(term));
 
   if (agentId === "orchestrator") {
-    const runMode = has("báo cáo tuần") ? "weekly" : has("nguyên nhân", "hấp thụ thấp") ? "investigate" : "slow";
-    const runTasks = runMode === "weekly"
-      ? ["Khóa số liệu tuần và kiểm tra CRM", "So sánh với tuần trước và chỉ tiêu", "Chọn 3 điểm quản lý cần chú ý", "Dựng KPI card và biểu đồ tuần", "Tạo weekly brief một trang"]
-      : runMode === "investigate"
-        ? ["Kiểm tra funnel lead → booking", "Đối chiếu giá, ưu đãi và peer group", "Xếp hạng giả thuyết nguyên nhân", "Trực quan hóa điểm nghẽn", "Tạo action plan kiểm chứng 30 ngày"]
-        : ["Đối soát snapshot và lọc căn DOM > 90", "Tạo peer group và benchmark", "Xếp hạng nguyên nhân kèm độ tin cậy", "Dựng biểu đồ có nguồn", "Đóng gói báo cáo chờ duyệt"];
-    const result = runMode === "weekly" ? `Tuần này có ${slowCount} căn bán chậm; ${focus.area} là điểm cần theo dõi. Weekly brief đã sẵn sàng để Sales Manager duyệt.` : runMode === "investigate" ? `${focus.area} có hấp thụ ${focus.absorption}% và DOM ${focus.avgDom} ngày. Ba giả thuyết chính: giá, ưu đãi và chuyển đổi lead.` : `${slowCount} căn bán chậm; ${focus.area} có DOM cao nhất (${focus.avgDom} ngày). Giá/m² và mức ưu đãi là hai tín hiệu cần ưu tiên kiểm tra.`;
-    return <div className="artifact-card run-artifact">
-      <div className="artifact-title"><span><Sparkles /> {runMode === "weekly" ? "Quy trình báo cáo tuần" : runMode === "investigate" ? "Quy trình điều tra nguyên nhân" : "Kế hoạch phân tích căn bán chậm"}</span><small>5/5 agent đã phản hồi</small></div>
-      <div className="run-steps">{agents.slice(1).map((agent, index) => <div key={agent.id}><AgentMark agent={agent} size="sm" /><span><strong>{index + 1}. {agent.name}</strong><small>{runTasks[index]}</small></span><em><Check /> Xong</em></div>)}</div>
-      <div className="run-summary"><strong>Kết quả hợp nhất</strong><span>{result}</span></div>
-    </div>;
+    const fallbackRun = createRun({ id: "run-result", prompt, projectId, startedAt: "09:33", memberIds: agents.slice(1).map((agent) => agent.id), phase: "complete" });
+    return <OrchestratorResult run={run ?? fallbackRun} agents={agents} projectName={project.name} snapshot={project.snapshot} slowCount={slowCount} focusArea={focus.area} focusDom={focus.avgDom} />;
   }
 
   if (agentId === "data" && has("thiếu", "chất lượng", "dq")) {
@@ -316,6 +193,7 @@ function AgentArtifact({ agentId, projectId, prompt = "", compact = false }: { a
 export function ChatWorkspace({ previewAgent }: { previewAgent?: AgentId } = {}) {
   const router = useRouter();
   const endRef = useRef<HTMLDivElement>(null);
+  const cancelledRunIdsRef = useRef(new Set<string>());
   const [ready, setReady] = useState(Boolean(previewAgent));
   const [user, setUser] = useState<UserProfile>({ name: "Nguyễn Minh Anh", email: "", staffId: "SO-0248", role: "Sales Operations" });
   const [activeId, setActiveId] = useState<AgentId>(previewAgent ?? "orchestrator");
@@ -324,11 +202,13 @@ export function ChatWorkspace({ previewAgent }: { previewAgent?: AgentId } = {})
   const [draft, setDraft] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [runPanelOpen, setRunPanelOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [workPhase, setWorkPhase] = useState<WorkPhase>("idle");
-  const [messagesByAgent, setMessagesByAgent] = useState(initialMessages);
+  const [messagesByAgent, setMessagesByAgent] = useState(createEmptyConversations);
+  const [runsByAgent, setRunsByAgent] = useState<Partial<Record<AgentId, AgentRun>>>({});
   const [shortTermHistory, setShortTermHistory] = useState<ShortTermHistory[]>([]);
-  const [groupsByAgent, setGroupsByAgent] = useState<Partial<Record<AgentId, AgentGroup>>>({ orchestrator: defaultCollaborationGroup });
+  const [groupsByAgent, setGroupsByAgent] = useState<Partial<Record<AgentId, AgentGroup>>>({});
 
   useEffect(() => {
     if (previewAgent) {
@@ -341,8 +221,8 @@ export function ChatWorkspace({ previewAgent }: { previewAgent?: AgentId } = {})
       const preview = new URLSearchParams(window.location.search);
       if (preview.get("figma") === "1") {
         const requestedAgent = preview.get("agent") as AgentId | null;
-        if (requestedAgent && requestedAgent in agentGuides) setActiveId(requestedAgent);
-        document.title = `VDAgent — ${requestedAgent ? agentGuides[requestedAgent].purpose.split(".")[0] : "Điều phối"}`;
+        if (requestedAgent && agents.some((agent) => agent.id === requestedAgent)) setActiveId(requestedAgent);
+        document.title = `VDAgent — ${requestedAgent ? repository.getAgentGuide(requestedAgent).purpose.split(".")[0] : "Điều phối"}`;
         setReady(true);
         return;
       }
@@ -358,16 +238,44 @@ export function ChatWorkspace({ previewAgent }: { previewAgent?: AgentId } = {})
   const activeProject = projects.find((project) => project.id === projectId) ?? projects[0];
   const filteredAgents = useMemo(() => agents.filter((agent) => `${agent.name} ${agent.role} ${agent.preview}`.toLowerCase().includes(query.toLowerCase())), [query]);
   const messages = messagesByAgent[activeId];
+  const hasConversation = messages.length > 0 || sending;
   const activeGroup = groupsByAgent[activeId];
+  const activeRun = runsByAgent[activeId];
 
   function chooseAgent(id: AgentId) { setActiveId(id); setSidebarOpen(false); setHistoryOpen(false); }
-  function pickPrompt(prompt: string) { setDraft(prompt); window.setTimeout(() => document.querySelector<HTMLInputElement>(".composer input")?.focus(), 0); }
   function logout() { window.localStorage.removeItem("vdagent-user"); router.push("/login"); }
   function newConversation() {
     setMessagesByAgent((current) => ({ ...current, [activeId]: [] }));
     setGroupsByAgent((current) => ({ ...current, [activeId]: undefined }));
+    setRunsByAgent((current) => ({ ...current, [activeId]: undefined }));
     setDraft("");
     setWorkPhase("idle");
+    setRunPanelOpen(false);
+  }
+  function transitionRun(agentId: AgentId, runId: string, phase: RunPhase) {
+    setRunsByAgent((current) => {
+      const run = current[agentId];
+      return run?.id === runId ? { ...current, [agentId]: setRunPhase(run, phase) } : current;
+    });
+    setGroupsByAgent((current) => current[agentId]?.id === runId ? { ...current, [agentId]: { ...current[agentId], phase } as AgentGroup } : current);
+    if (agentId === activeId) setWorkPhase(phase);
+  }
+  function cancelRun() {
+    if (!activeRun || !["receiving", "thinking", "collaborating", "retrying"].includes(activeRun.phase)) return;
+    cancelledRunIdsRef.current.add(activeRun.id);
+    transitionRun(activeId, activeRun.id, "cancelling");
+    setSending(false);
+    window.setTimeout(() => transitionRun(activeId, activeRun.id, "cancelled"), 360);
+  }
+  function retryRun() {
+    if (!activeRun || !["failed", "cancelled"].includes(activeRun.phase)) return;
+    const runId = crypto.randomUUID();
+    const retriedRun = createRun({ id: runId, prompt: activeRun.prompt, projectId: activeRun.projectId, startedAt: activeRun.startedAt, memberIds: activeRun.tasks.map((task) => task.agentId), phase: "retrying" });
+    setRunsByAgent((current) => ({ ...current, [activeId]: retriedRun }));
+    setGroupsByAgent((current) => ({ ...current, [activeId]: { id: runId, title: getGroupTitle(activeRun.prompt), prompt: activeRun.prompt, memberIds: retriedRun.tasks.map((task) => task.agentId), phase: "retrying" } }));
+    setSending(true); setWorkPhase("retrying"); setRunPanelOpen(true);
+    window.setTimeout(() => transitionRun(activeId, runId, "collaborating"), 650);
+    window.setTimeout(() => { transitionRun(activeId, runId, "complete"); setSending(false); }, 1500);
   }
   function sendMessage(event: FormEvent) {
     event.preventDefault();
@@ -377,34 +285,38 @@ export function ChatWorkspace({ previewAgent }: { previewAgent?: AgentId } = {})
     setMessagesByAgent((current) => ({ ...current, [activeId]: [...current[activeId], { id: crypto.randomUUID(), kind: "user", text, time: now }] }));
     setShortTermHistory((current) => [{ id: crypto.randomUUID(), agentId: activeId, prompt: text, project: activeProject.name, time: now }, ...current].slice(0, 6));
     const groupId = crypto.randomUUID();
-    const memberIds = selectCollaborationAgents(text, activeId);
+    const requestedAgentId = activeId;
+    const memberIds = selectCollaborationAgents(text, requestedAgentId, agents);
     setGroupsByAgent((current) => ({ ...current, [activeId]: { id: groupId, title: getGroupTitle(text), prompt: text, memberIds, phase: "receiving" } }));
-    setDraft(""); setSending(true); setWorkPhase("receiving");
+    setRunsByAgent((current) => ({ ...current, [requestedAgentId]: createRun({ id: groupId, prompt: text, projectId, startedAt: now, memberIds }) }));
+    cancelledRunIdsRef.current.delete(groupId);
+    setDraft(""); setSending(true); setWorkPhase("receiving"); setRunPanelOpen(true); setHistoryOpen(false);
     window.setTimeout(() => {
-      setWorkPhase("thinking");
-      setGroupsByAgent((current) => current[activeId]?.id === groupId ? { ...current, [activeId]: { ...current[activeId], phase: "thinking" } as AgentGroup } : current);
+      if (!cancelledRunIdsRef.current.has(groupId)) transitionRun(requestedAgentId, groupId, "thinking");
     }, 420);
     window.setTimeout(() => {
-      setWorkPhase("collaborating");
-      setGroupsByAgent((current) => current[activeId]?.id === groupId ? { ...current, [activeId]: { ...current[activeId], phase: "collaborating" } as AgentGroup } : current);
+      if (!cancelledRunIdsRef.current.has(groupId)) transitionRun(requestedAgentId, groupId, "collaborating");
     }, 980);
     window.setTimeout(() => {
+      if (cancelledRunIdsRef.current.has(groupId)) return;
       const projectRows = getProjectUnits(projectId);
       const projectMetrics = getAreaMetrics(projectId);
       const topArea = [...projectMetrics].sort((a, b) => b.avgDom - a.avgDom)[0];
       const slowRows = projectRows.filter((row) => row.status === "Đang bán" && row.daysOnMarket > 90);
       const promptText = text.toLocaleLowerCase("vi-VN");
       const asks = (...terms: string[]) => terms.some((term) => promptText.includes(term));
-      const response = activeId === "orchestrator" ? `Tôi đã phân tích yêu cầu “${text}” và tạo nhóm gồm ${memberIds.length} agent liên quan: ${memberIds.map((id) => agents.find((agent) => agent.id === id)?.name).filter(Boolean).join(", ")}. Các agent đã bàn giao phần việc để tôi hợp nhất thành kết quả có thể truy vết.`
-        : activeId === "data" ? asks("thiếu", "chất lượng", "dq") ? `Đã audit ${projectRows.length.toLocaleString("vi-VN")} dòng: ${projectRows.filter((row) => row.dataQuality === "PARTIAL").length} dòng PARTIAL do thiếu lịch sử giá; không phát hiện mã căn trùng.` : asks("giá trung bình", "mỗi m²", "m2", "m²") ? `Giá chào trung bình toàn dự án là ${(projectRows.reduce((sum, row) => sum + row.pricePerSqm, 0) / projectRows.length).toFixed(1)} triệu đồng/m². Tôi đã phân rã theo phân khu và kèm DOM, hấp thụ, ưu đãi để tránh đọc giá tách rời hiệu suất.` : `Truy vấn hoàn tất trên ${projectRows.length.toLocaleString("vi-VN")} căn. Tôi tìm thấy ${slowRows.length} căn đang bán có DOM trên 90 ngày; bảng kết quả giữ cả vị trí, diện tích, giá/m², lead, booking và cờ chất lượng.`
-        : activeId === "compare" ? asks("5 căn", "tương đồng với") ? "Tôi đã chọn 5 căn gần nhất theo loại căn, diện tích ±10%, thời điểm mở bán và mức giá. Kết quả được xếp hạng theo độ tương đồng thay vì chỉ liệt kê cùng phân khu." : asks("xếp hạng") ? "Tôi đã xếp hạng các phân khu theo tỷ lệ hấp thụ, đồng thời giữ cỡ mẫu và DOM để tránh thứ hạng gây hiểu nhầm." : `Tôi đã tạo nhóm so sánh cho ${topArea.area}. Bảng benchmark bên dưới cho thấy chênh lệch DOM, hấp thụ, giá/m² và ưu đãi của từng phân khu.`
-        : activeId === "insight" ? `Tôi đã diễn giải câu hỏi “${text}” thành 3 nhận định có thể hành động. Mỗi nhận định có độ tin cậy, evidence và giới hạn để Sales Manager không hiểu nhầm tương quan thành nguyên nhân.`
-        : activeId === "chart" ? asks("hấp thụ", "loại căn") ? "Tôi đã chuyển dữ liệu thành biểu đồ thanh ngang theo Studio, 1PN, 2PN và 3PN; mỗi thanh kèm tỷ lệ hấp thụ và cỡ mẫu." : asks("giá/m²", "2pn") ? "Tôi đã đặt giá/m² cạnh DOM của riêng nhóm 2PN để thấy phân khu nào vừa định giá cao vừa tồn kho lâu." : `Tôi đã trực quan hóa DOM trung bình của ${projectMetrics.length} phân khu, kèm trục đo, cỡ mẫu và ngưỡng cảnh báo 90 ngày.`
+      const response = requestedAgentId === "orchestrator" ? `Tôi đã phân tích yêu cầu “${text}” và tạo nhóm gồm ${memberIds.length} agent liên quan: ${memberIds.map((id) => agents.find((agent) => agent.id === id)?.name).filter(Boolean).join(", ")}. Các agent đã bàn giao phần việc để tôi hợp nhất thành kết quả có thể truy vết.`
+        : requestedAgentId === "data" ? asks("thiếu", "chất lượng", "dq") ? `Đã audit ${projectRows.length.toLocaleString("vi-VN")} dòng: ${projectRows.filter((row) => row.dataQuality === "PARTIAL").length} dòng PARTIAL do thiếu lịch sử giá; không phát hiện mã căn trùng.` : asks("giá trung bình", "mỗi m²", "m2", "m²") ? `Giá chào trung bình toàn dự án là ${(projectRows.reduce((sum, row) => sum + row.pricePerSqm, 0) / projectRows.length).toFixed(1)} triệu đồng/m². Tôi đã phân rã theo phân khu và kèm DOM, hấp thụ, ưu đãi để tránh đọc giá tách rời hiệu suất.` : `Truy vấn hoàn tất trên ${projectRows.length.toLocaleString("vi-VN")} căn. Tôi tìm thấy ${slowRows.length} căn đang bán có DOM trên 90 ngày; bảng kết quả giữ cả vị trí, diện tích, giá/m², lead, booking và cờ chất lượng.`
+        : requestedAgentId === "compare" ? asks("5 căn", "tương đồng với") ? "Tôi đã chọn 5 căn gần nhất theo loại căn, diện tích ±10%, thời điểm mở bán và mức giá. Kết quả được xếp hạng theo độ tương đồng thay vì chỉ liệt kê cùng phân khu." : asks("xếp hạng") ? "Tôi đã xếp hạng các phân khu theo tỷ lệ hấp thụ, đồng thời giữ cỡ mẫu và DOM để tránh thứ hạng gây hiểu nhầm." : `Tôi đã tạo nhóm so sánh cho ${topArea.area}. Bảng benchmark bên dưới cho thấy chênh lệch DOM, hấp thụ, giá/m² và ưu đãi của từng phân khu.`
+        : requestedAgentId === "insight" ? `Tôi đã diễn giải câu hỏi “${text}” thành 3 nhận định có thể hành động. Mỗi nhận định có độ tin cậy, evidence và giới hạn để Sales Manager không hiểu nhầm tương quan thành nguyên nhân.`
+        : requestedAgentId === "chart" ? asks("hấp thụ", "loại căn") ? "Tôi đã chuyển dữ liệu thành biểu đồ thanh ngang theo Studio, 1PN, 2PN và 3PN; mỗi thanh kèm tỷ lệ hấp thụ và cỡ mẫu." : asks("giá/m²", "2pn") ? "Tôi đã đặt giá/m² cạnh DOM của riêng nhóm 2PN để thấy phân khu nào vừa định giá cao vừa tồn kho lâu." : `Tôi đã trực quan hóa DOM trung bình của ${projectMetrics.length} phân khu, kèm trục đo, cỡ mẫu và ngưỡng cảnh báo 90 ngày.`
         : asks("executive", "một trang") ? "Tôi đã rút báo cáo thành executive summary một trang: một kết luận, ba KPI và ba quyết định đề xuất cho Sales Manager." : asks("claim", "evidence", "thiếu") ? "Tôi đã audit từng claim trong báo cáo: 10/12 claim đủ evidence, 2 claim được tách riêng để người dùng duyệt hoặc bổ sung dữ liệu." : `Tôi đã tổng hợp yêu cầu “${text}” thành bản nháp 6 phần cho Sales Manager, gồm biểu đồ, evidence và các claim chờ xác nhận.`;
-      const reply: Message = { id: crypto.randomUUID(), kind: "agent", author: activeAgent.name, text: response, time: now, evidence: activeId === "orchestrator" ? `${memberIds.length} agent tham gia · Run RUN-025` : `Nguồn mô phỏng · ${activeProject.name} ${activeProject.snapshot}`, artifact: activeId, artifactPrompt: text };
-      setMessagesByAgent((current) => ({ ...current, [activeId]: [...current[activeId], reply] }));
-      setGroupsByAgent((current) => current[activeId]?.id === groupId ? { ...current, [activeId]: { ...current[activeId], phase: "complete" } as AgentGroup } : current);
-      setSending(false); setWorkPhase("complete"); window.setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 40);
+      const finalPhase: RunPhase = asks("thất bại", "giả lập lỗi", "run lỗi") ? "failed" : asks("partial", "chờ duyệt") ? "partial" : "complete";
+      const requestedAgent = agents.find((agent) => agent.id === requestedAgentId) ?? agents[0];
+      const reply: Message = { id: crypto.randomUUID(), kind: "agent", author: requestedAgent.name, text: response, time: now, evidence: requestedAgentId === "orchestrator" ? `${memberIds.length} agent tham gia · Run RUN-025` : `Nguồn mô phỏng · ${activeProject.name} ${activeProject.snapshot}`, artifact: requestedAgentId, artifactPrompt: text };
+      setMessagesByAgent((current) => ({ ...current, [requestedAgentId]: [...current[requestedAgentId], reply] }));
+      transitionRun(requestedAgentId, groupId, finalPhase);
+      setSending(false); window.setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 40);
     }, 1900);
   }
 
@@ -412,39 +324,23 @@ export function ChatWorkspace({ previewAgent }: { previewAgent?: AgentId } = {})
 
   return <main className="app-shell">
     {sidebarOpen && <button className="mobile-overlay" aria-label="Đóng menu" onClick={() => setSidebarOpen(false)} />}
-    <aside className={`sidebar ${sidebarOpen ? "sidebar--open" : ""}`}>
-      <div className="window-row"><div className="traffic-lights" aria-hidden="true"><span /><span /><span /></div><button className="icon-button new-chat" aria-label="Tạo cuộc trò chuyện mới" onClick={newConversation}><Plus /></button><button className="icon-button mobile-close" aria-label="Đóng menu" onClick={() => setSidebarOpen(false)}><X /></button></div>
-      <label className="search-box"><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm agent hoặc phân tích" /><kbd>⌘K</kbd></label>
-      {activeGroup && <SidebarAgentGroup group={activeGroup} onAgent={chooseAgent} />}
-      <nav className="agent-list" aria-label="Danh sách agent">{filteredAgents.map((agent) => {
-        const groupState = activeGroup?.memberIds.includes(agent.id) ? getGroupMemberState(activeGroup, agent.id) : null;
-        const isAgentWorking = groupState === "working";
-        return <button key={agent.id} className={`agent-item ${activeId === agent.id ? "agent-item--active" : ""} ${isAgentWorking ? "agent-item--working" : ""}`} onClick={() => chooseAgent(agent.id)}><AgentMark agent={agent} /><span className="agent-copy"><span className="agent-title"><strong>{agent.name}</strong>{isAgentWorking ? <BouncingDots label={`${agent.name} đang làm việc`} /> : <time>{agent.time}</time>}</span><span className="agent-role">{agent.role}{groupState && <em>{groupState === "working" ? "Đang làm việc" : groupState === "done" ? "Đã hoàn tất" : "Đang chờ"}</em>}</span><span className="agent-preview">{agent.preview}</span></span>{agent.unread && !isAgentWorking && <span className="unread-dot" />}</button>;
-      })}</nav>
-      <div className="profile-row"><span className="avatar">{user.name.split(" ").slice(-2).map((part) => part[0]).join("")}</span><span><strong>{user.name}</strong><small>{user.role} · {user.staffId}</small></span><button className="icon-button" aria-label="Đăng xuất" onClick={logout}><LogOut /></button></div>
-    </aside>
+    <WorkspaceSidebar agents={filteredAgents} activeId={activeId} activeGroup={activeGroup} groupSummary={activeGroup ? <SidebarAgentGroup group={activeGroup} agents={agents} onAgent={chooseAgent} /> : undefined} user={user} query={query} open={sidebarOpen} getGroupMemberState={getGroupMemberState} onQueryChange={setQuery} onChooseAgent={chooseAgent} onNewConversation={newConversation} onLogout={logout} onClose={() => setSidebarOpen(false)} />
 
     <section className="workspace">
-      <header className="topbar"><button className="icon-button menu-button" onClick={() => setSidebarOpen(true)}><Menu /></button><AgentMark agent={activeAgent} size="sm" /><div className="header-copy"><strong>{activeAgent.name}</strong><span>{activeAgent.role}</span></div><span className="status-pill"><span /> Đang hoạt động</span><label className="project-select"><select value={projectId} onChange={(e) => setProjectId(e.target.value)}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><ChevronDown /></label><button className={`history-button ${historyOpen ? "history-button--active" : ""}`} onClick={() => setHistoryOpen(!historyOpen)}><History /><span>Lịch sử</span></button></header>
+      <WorkspaceTopbar agent={activeAgent} projects={projects} projectId={projectId} historyOpen={historyOpen} onOpenSidebar={() => setSidebarOpen(true)} onProjectChange={setProjectId} onToggleHistory={() => setHistoryOpen(!historyOpen)} />
       <div className="workspace-body">
-        <div className="conversation" role="log" aria-live="polite"><div className="conversation-inner">
-          <div className="context-card"><span className="context-icon"><ChartNoAxesCombined /></span><span><small>PHẠM VI PHÂN TÍCH</small><strong>{activeProject.name} · {activeProject.snapshot}</strong></span><span className="context-meta"><Check /> Snapshot đã khóa · DQ {activeProject.dq}%</span></div>
-          <AgentGuide agent={activeAgent} onPrompt={pickPrompt} />
-          {activeGroup && <CollaborationGroup group={activeGroup} onAgent={chooseAgent} />}
-          <div className="thread-label"><span>{messages.length ? "Hội thoại mô phỏng" : "Bắt đầu một phân tích mới"}</span></div>
-          {messages.map((message) => {
-            if (message.kind === "system") return <div key={message.id} className="system-message"><span>{message.text}</span></div>;
-            if (message.kind === "user") return <div key={message.id} className="message-row message-row--user">{message.time && <time>{message.time}</time>}<div className="bubble bubble--user">{message.text}</div></div>;
-            const authorAgent = agents.find((agent) => agent.name === message.author) ?? activeAgent;
-            return <div key={message.id} className="message-row message-row--agent"><AgentMark agent={authorAgent} size="sm" /><div className="agent-message"><div className="message-meta"><strong>{message.author}</strong>{message.time && <time>{message.time}</time>}</div><div className="bubble bubble--agent">{message.text}</div>{message.artifact && <AgentArtifact agentId={message.artifact} projectId={projectId} prompt={message.artifactPrompt} compact />}{message.evidence && <button className="evidence-chip"><FileText /> {message.evidence}</button>}</div></div>;
-          })}
-          {sending && <div className={`thinking-indicator thinking-indicator--${workPhase}`}><AgentMark agent={activeAgent} size="sm" /><div><strong>{workPhase === "receiving" ? `${activeAgent.name} đang tiếp nhận tin nhắn` : workPhase === "thinking" ? `${activeAgent.name} đang suy nghĩ` : "Các agent đang trao đổi trong nhóm"}</strong><span>{workPhase === "receiving" ? "Đang đọc phạm vi và mục tiêu phân tích" : workPhase === "thinking" ? "Đang chọn dữ liệu, rule và agent liên quan" : "Đang đối chiếu kết quả và hợp nhất bằng chứng"}</span></div><BouncingDots label="Hệ thống đang xử lý" /></div>}<div ref={endRef} />
-        </div></div>
-        {historyOpen && <aside className="history-panel"><div className="history-header"><div><small>LỊCH SỬ PHÂN TÍCH</small><strong>{activeAgent.name}</strong></div><button className="icon-button" onClick={() => setHistoryOpen(false)}><X /></button></div>
-          <section className="short-history"><div className="short-history-title"><span><Clock3 /> HOẠT ĐỘNG GẦN ĐÂY</span></div>{shortTermHistory.length ? <div className="short-history-list">{shortTermHistory.map((item) => { const itemAgent = agents.find((agent) => agent.id === item.agentId) ?? agents[0]; return <div className="short-history-item" key={item.id}><AgentMark agent={itemAgent} size="sm" /><span><strong>{item.prompt}</strong><small>{itemAgent.name} · {item.project}</small></span><time>{item.time}</time></div>; })}</div> : <div className="short-history-empty"><Clock3 /><span><strong>Chưa có hoạt động mới</strong><small>Câu hỏi gần đây sẽ xuất hiện tại đây.</small></span></div>}</section>
-          <div className="history-divider"><span>RUN ĐÃ LƯU</span></div><div className="history-list">{conversationHistory.map((item, index) => <button key={item.id} className={index === 0 ? "history-item--active" : ""}><span className="history-icon"><Clock3 /></span><span><strong>{item.title}</strong><small>{item.detail}</small><time>{item.time}</time></span></button>)}</div><div className="history-note"><ShieldCheck /><p><strong>Lịch sử dài hạn được lưu theo run</strong><span>Lịch sử ngắn hạn phía trên sẽ được xóa khi tải lại trang.</span></p></div></aside>}
+        {!hasConversation ? <section className={styles.welcome} aria-labelledby="chat-welcome-title">
+          <div className={styles.welcomeContent}>
+            <h1 id="chat-welcome-title">What should we explore?</h1>
+            <div className={styles.welcomeComposer}>
+              <PromptComposer agentName={activeAgent.name} draft={draft} sending={sending} onDraftChange={setDraft} onSubmit={sendMessage} placeholder="Ask about your data, comparisons, insights or reports…" />
+            </div>
+          </div>
+        </section> : <ConversationStream activeAgent={activeAgent} agents={agents} project={activeProject} messages={messages} sending={sending} workPhase={workPhase} guide={null} endRef={endRef} renderArtifact={(message) => message.artifact ? <AgentArtifact agentId={message.artifact} projectId={projectId} prompt={message.artifactPrompt} compact run={message.artifact === "orchestrator" ? activeRun : undefined} /> : null} />}
+        {historyOpen && <HistoryPanel activeAgent={activeAgent} agents={agents} recentItems={shortTermHistory} savedRuns={conversationHistory} onClose={() => setHistoryOpen(false)} />}
+        {!historyOpen && hasConversation && runPanelOpen && activeId === "orchestrator" && activeRun && <RunProgressPanel run={activeRun} agents={agents} onRetry={retryRun} onCancel={cancelRun} onClose={() => setRunPanelOpen(false)} />}
       </div>
-      <div className="composer-wrap"><form className="composer" onSubmit={sendMessage}><button type="button" className="composer-action" aria-label="Thêm tệp"><Plus /></button><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={`Nhắn cho ${activeAgent.name} — nêu dự án, thời gian và điều bạn cần biết`} /><button type="button" className="composer-action" aria-label="Ghi âm"><Mic /></button><button type="submit" className="send-button" disabled={!draft.trim() || sending}><ArrowUp /></button></form><p>VDAgent có thể mắc lỗi. Hãy kiểm tra các bằng chứng quan trọng.</p></div>
+      {hasConversation && <PromptComposer agentName={activeAgent.name} draft={draft} sending={sending} onDraftChange={setDraft} onSubmit={sendMessage} />}
     </section>
   </main>;
 }

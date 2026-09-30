@@ -1,12 +1,6 @@
-export type PropertyStatus = "Đang bán" | "Giữ chỗ" | "Đã bán";
-export type PropertyUnit = {
-  code: string; projectId: string; project: string; city: string; area: string; tower: string;
-  floor: number; direction: "Đông" | "Tây" | "Nam" | "Bắc"; view: string;
-  type: "Studio" | "1PN" | "2PN" | "3PN"; size: number; listPrice: number;
-  pricePerSqm: number; daysOnMarket: number; status: PropertyStatus; absorption: number;
-  discountRate: number; leads: number; bookings: number; launchMonth: string;
-  dataQuality: "COMPLETE" | "PARTIAL";
-};
+import type { AreaMetric, PropertyStatus, PropertyUnit } from "@/types/project";
+
+export type { AreaMetric, PropertyStatus, PropertyUnit } from "@/types/project";
 
 export const projects = [
   { id: "green-avenue", name: "Green Avenue", prefix: "GA", city: "Hà Nội", snapshot: "Q2/2026", totalUnits: 1248, dq: 98.7, areas: ["Riverside", "Garden", "Parkside"] },
@@ -64,7 +58,6 @@ export const propertyUnits: PropertyUnit[] = projects.flatMap((project) => {
   });
 });
 
-export type AreaMetric = { area: string; units: number; avgDom: number; absorption: number; pricePerSqm: number; discountRate: number; leads: number };
 export function getProjectUnits(projectId: string) { return propertyUnits.filter((unit) => unit.projectId === projectId); }
 export function getAreaMetrics(projectId: string): AreaMetric[] {
   const rows = getProjectUnits(projectId);
@@ -77,19 +70,3 @@ export function getAreaMetrics(projectId: string): AreaMetric[] {
 export function getSlowMovingUnits(projectId: string, limit = 8) {
   return getProjectUnits(projectId).filter((unit) => unit.status === "Đang bán" && unit.daysOnMarket > 90).sort((a, b) => b.daysOnMarket - a.daysOnMarket).slice(0, limit);
 }
-
-export const conversationHistory = [
-  { id: "run-024", title: "Căn bán chậm Green Avenue", detail: "6 agent · Hoàn tất", time: "Hôm nay, 09:32" },
-  { id: "run-019", title: "So sánh Riverside và Garden", detail: "3 agent · Hoàn tất", time: "Hôm qua, 16:18" },
-  { id: "run-012", title: "Báo cáo hấp thụ tháng 5", detail: "4 agent · Bản nháp", time: "18/06/2026" },
-  { id: "run-006", title: "Kiểm tra chất lượng CRM", detail: "1 agent · Có cảnh báo", time: "11/06/2026" },
-];
-
-export const agentGuides = {
-  orchestrator: { purpose: "Điều phối một yêu cầu phân tích hoàn chỉnh qua nhiều agent và trả về kết quả có bằng chứng.", needs: "Nêu dự án, khoảng thời gian và câu hỏi kinh doanh bạn cần giải quyết.", outputs: ["Kế hoạch xử lý", "Kết quả hợp nhất", "Agent và bằng chứng đã dùng"], prompts: ["Phân tích căn bán chậm tại Green Avenue trong Q2/2026", "Điều tra nguyên nhân hấp thụ thấp của phân khu Riverside", "Tạo báo cáo tuần cho Sales Manager"] },
-  data: { purpose: "Tra cứu kho dữ liệu, kiểm tra chất lượng và tính metric định lượng.", needs: "Cho biết dự án, phân khu, loại căn, thời gian hoặc mã căn cần kiểm tra.", outputs: ["Dataset đã lọc", "Metric chuẩn", "Cảnh báo chất lượng dữ liệu"], prompts: ["Liệt kê các căn có DOM trên 90 ngày", "Kiểm tra dữ liệu thiếu trong snapshot Q2/2026", "Tính giá trung bình mỗi m² theo phân khu"] },
-  compare: { purpose: "Tạo nhóm căn tương đồng và so sánh hiệu suất theo rule đã cấu hình.", needs: "Chọn căn hoặc phân khu gốc và tiêu chí muốn so sánh.", outputs: ["Peer group", "Benchmark", "Mức chênh lệch và xếp hạng"], prompts: ["So sánh Riverside với các phân khu tương đồng", "Tìm 5 căn tương đồng với GA-RI-0001", "Xếp hạng tốc độ hấp thụ các phân khu"] },
-  insight: { purpose: "Diễn giải pattern nghiệp vụ từ metric và bằng chứng đã được xác thực.", needs: "Chọn insight, metric hoặc kết quả so sánh bạn muốn diễn giải.", outputs: ["Nhận định có căn cứ", "Mức tin cậy", "Giới hạn của kết luận"], prompts: ["Yếu tố nào liên quan tới tốc độ bán chậm?", "Giải thích chênh lệch hấp thụ tại Riverside", "Insight nào cần Sales Manager chú ý?"] },
-  chart: { purpose: "Biến metric thành biểu đồ và giữ liên kết về dữ liệu nguồn.", needs: "Nêu metric, chiều phân tích và dạng biểu đồ mong muốn.", outputs: ["Biểu đồ bằng chứng", "ChartSpec", "Liên kết dữ liệu nguồn"], prompts: ["Vẽ biểu đồ DOM theo phân khu", "Trực quan hóa hấp thụ theo loại căn", "So sánh giá/m² và DOM của nhóm 2PN"] },
-  report: { purpose: "Tổng hợp metric, insight, biểu đồ và evidence thành báo cáo để review.", needs: "Chọn phạm vi báo cáo, đối tượng đọc và các phần cần nhấn mạnh.", outputs: ["Bản nháp 6 phần", "Danh mục bằng chứng", "Điểm cần người dùng duyệt"], prompts: ["Tạo báo cáo Green Avenue Q2 cho Sales Manager", "Tóm tắt executive summary trong một trang", "Kiểm tra claim nào còn thiếu evidence"] },
-} as const;
