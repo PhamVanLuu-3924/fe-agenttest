@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  ArrowRight, BarChart3, Check, Clock3, Database, FileCheck2, FileText,
+  BarChart3, Check, Clock3, Database, FileCheck2, FileText,
   Lightbulb, ShieldCheck, Users,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -11,15 +11,15 @@ import { HistoryPanel } from "@/components/conversation/history-panel";
 import { PromptComposer } from "@/components/conversation/prompt-composer";
 import { WorkspaceSidebar } from "@/components/layout/workspace-sidebar";
 import { WorkspaceTopbar } from "@/components/layout/workspace-topbar";
-import { CollaborationGroup } from "@/components/run/collaboration-group";
 import { OrchestratorResult } from "@/components/run/orchestrator-result";
 import { RunProgressPanel } from "@/components/run/run-progress-panel";
 import { createRun, getGroupMemberState, getGroupTitle, selectCollaborationAgents, setRunPhase } from "@/components/run/run-state";
 import { SidebarAgentGroup } from "@/components/run/sidebar-agent-group";
 import { AgentMark } from "@/components/shared/agent-mark";
 import { MetricCard } from "@/components/shared/metric-card";
-import { defaultCollaborationGroup, mockWorkspaceRepository } from "@/mocks/workspace-repository";
-import type { Agent, AgentGroup, AgentId, AgentRun, Message, RunPhase, ShortTermHistory, UserProfile, WorkPhase } from "@/types/workspace";
+import { mockWorkspaceRepository } from "@/mocks/workspace-repository";
+import type { AgentGroup, AgentId, AgentRun, Message, RunPhase, ShortTermHistory, UserProfile, WorkPhase } from "@/types/workspace";
+import styles from "./chat-workspace.module.css";
 
 const repository = mockWorkspaceRepository;
 const agents = repository.getAgents();
@@ -29,13 +29,8 @@ const getProjectUnits = repository.getProjectUnits;
 const getAreaMetrics = repository.getAreaMetrics;
 const getSlowMovingUnits = repository.getSlowMovingUnits;
 
-function AgentGuide({ agent, onPrompt }: { agent: Agent; onPrompt: (prompt: string) => void }) {
-  const guide = repository.getAgentGuide(agent.id);
-  return <section className="guide-card">
-    <div className="guide-heading"><AgentMark agent={agent} /><div><span>BẠN ĐANG LÀM VIỆC VỚI</span><h2>{agent.name}</h2><p>{guide.purpose}</p></div></div>
-    <div className="guide-columns"><div><small>BẠN CẦN CUNG CẤP</small><p>{guide.needs}</p></div><div><small>AGENT SẼ TRẢ VỀ</small><ul>{guide.outputs.map((item) => <li key={item}><Check /> {item}</li>)}</ul></div></div>
-    <div className="prompt-group"><small>CÂU HỎI GỢI Ý</small><div>{guide.prompts.map((prompt) => <button key={prompt} onClick={() => onPrompt(prompt)}>{prompt}<ArrowRight /></button>)}</div></div>
-  </section>;
+function createEmptyConversations(): Record<AgentId, Message[]> {
+  return { orchestrator: [], data: [], compare: [], insight: [], chart: [], report: [] };
 }
 
 function DomChart({ projectId }: { projectId: string }) {
@@ -207,13 +202,13 @@ export function ChatWorkspace({ previewAgent }: { previewAgent?: AgentId } = {})
   const [draft, setDraft] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [runPanelOpen, setRunPanelOpen] = useState(true);
+  const [runPanelOpen, setRunPanelOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [workPhase, setWorkPhase] = useState<WorkPhase>("idle");
-  const [messagesByAgent, setMessagesByAgent] = useState(() => repository.getInitialMessages());
-  const [runsByAgent, setRunsByAgent] = useState(() => repository.getInitialRuns());
+  const [messagesByAgent, setMessagesByAgent] = useState(createEmptyConversations);
+  const [runsByAgent, setRunsByAgent] = useState<Partial<Record<AgentId, AgentRun>>>({});
   const [shortTermHistory, setShortTermHistory] = useState<ShortTermHistory[]>([]);
-  const [groupsByAgent, setGroupsByAgent] = useState<Partial<Record<AgentId, AgentGroup>>>({ orchestrator: defaultCollaborationGroup });
+  const [groupsByAgent, setGroupsByAgent] = useState<Partial<Record<AgentId, AgentGroup>>>({});
 
   useEffect(() => {
     if (previewAgent) {
@@ -243,11 +238,11 @@ export function ChatWorkspace({ previewAgent }: { previewAgent?: AgentId } = {})
   const activeProject = projects.find((project) => project.id === projectId) ?? projects[0];
   const filteredAgents = useMemo(() => agents.filter((agent) => `${agent.name} ${agent.role} ${agent.preview}`.toLowerCase().includes(query.toLowerCase())), [query]);
   const messages = messagesByAgent[activeId];
+  const hasConversation = messages.length > 0 || sending;
   const activeGroup = groupsByAgent[activeId];
   const activeRun = runsByAgent[activeId];
 
   function chooseAgent(id: AgentId) { setActiveId(id); setSidebarOpen(false); setHistoryOpen(false); }
-  function pickPrompt(prompt: string) { setDraft(prompt); window.setTimeout(() => document.querySelector<HTMLInputElement>(".composer input")?.focus(), 0); }
   function logout() { window.localStorage.removeItem("vdagent-user"); router.push("/login"); }
   function newConversation() {
     setMessagesByAgent((current) => ({ ...current, [activeId]: [] }));
@@ -334,11 +329,18 @@ export function ChatWorkspace({ previewAgent }: { previewAgent?: AgentId } = {})
     <section className="workspace">
       <WorkspaceTopbar agent={activeAgent} projects={projects} projectId={projectId} historyOpen={historyOpen} onOpenSidebar={() => setSidebarOpen(true)} onProjectChange={setProjectId} onToggleHistory={() => setHistoryOpen(!historyOpen)} />
       <div className="workspace-body">
-        <ConversationStream activeAgent={activeAgent} agents={agents} project={activeProject} messages={messages} sending={sending} workPhase={workPhase} guide={<AgentGuide agent={activeAgent} onPrompt={pickPrompt} />} collaboration={activeGroup ? <CollaborationGroup group={activeGroup} agents={agents} onAgent={chooseAgent} /> : undefined} endRef={endRef} renderArtifact={(message) => message.artifact ? <AgentArtifact agentId={message.artifact} projectId={projectId} prompt={message.artifactPrompt} compact run={message.artifact === "orchestrator" ? activeRun : undefined} /> : null} />
+        {!hasConversation ? <section className={styles.welcome} aria-labelledby="chat-welcome-title">
+          <div className={styles.welcomeContent}>
+            <h1 id="chat-welcome-title">What should we explore?</h1>
+            <div className={styles.welcomeComposer}>
+              <PromptComposer agentName={activeAgent.name} draft={draft} sending={sending} onDraftChange={setDraft} onSubmit={sendMessage} placeholder="Ask about your data, comparisons, insights or reports…" />
+            </div>
+          </div>
+        </section> : <ConversationStream activeAgent={activeAgent} agents={agents} project={activeProject} messages={messages} sending={sending} workPhase={workPhase} guide={null} endRef={endRef} renderArtifact={(message) => message.artifact ? <AgentArtifact agentId={message.artifact} projectId={projectId} prompt={message.artifactPrompt} compact run={message.artifact === "orchestrator" ? activeRun : undefined} /> : null} />}
         {historyOpen && <HistoryPanel activeAgent={activeAgent} agents={agents} recentItems={shortTermHistory} savedRuns={conversationHistory} onClose={() => setHistoryOpen(false)} />}
-        {!historyOpen && runPanelOpen && activeId === "orchestrator" && activeRun && <RunProgressPanel run={activeRun} agents={agents} onRetry={retryRun} onCancel={cancelRun} onClose={() => setRunPanelOpen(false)} />}
+        {!historyOpen && hasConversation && runPanelOpen && activeId === "orchestrator" && activeRun && <RunProgressPanel run={activeRun} agents={agents} onRetry={retryRun} onCancel={cancelRun} onClose={() => setRunPanelOpen(false)} />}
       </div>
-      <PromptComposer agentName={activeAgent.name} draft={draft} sending={sending} onDraftChange={setDraft} onSubmit={sendMessage} />
+      {hasConversation && <PromptComposer agentName={activeAgent.name} draft={draft} sending={sending} onDraftChange={setDraft} onSubmit={sendMessage} />}
     </section>
   </main>;
 }

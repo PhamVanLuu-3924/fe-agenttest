@@ -1,0 +1,65 @@
+.welcome {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  place-items: center;
+  padding: 40px 24px 18vh;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(239, 131, 84, 0.08), transparent 34%),
+    var(--surface);
+}
+
+.welcomeContent {
+  width: min(720px, 100%);
+  text-align: center;
+  animation: welcomeIn 280ms ease-out both;
+}
+
+.welcomeContent h1 {
+  margin: 0 0 28px;
+  color: var(--ink);
+  font-size: clamp(30px, 4vw, 48px);
+  font-weight: 620;
+  letter-spacing: -0.045em;
+  line-height: 1.08;
+}
+
+.welcomeComposer {
+  text-align: left;
+}
+
+.welcomeComposer :global(.composer-wrap) {
+  width: 100%;
+  padding: 0;
+  background: transparent;
+}
+
+.welcomeComposer :global(.composer) {
+  min-height: 58px;
+  height: auto;
+  border-radius: 20px;
+  box-shadow: 0 18px 55px rgba(33, 33, 24, 0.11);
+}
+
+.welcomeComposer :global(.composer textarea) {
+  font-size: 14px !important;
+}
+
+.welcomeComposer :global(.composer-wrap > p) {
+  margin-top: 12px;
+}
+
+@keyframes welcomeIn {
+  from { opacity: 0; transform: translateY(10px); }
+}
+
+@media (max-width: 720px) {
+  .welcome {
+    padding: 32px 16px 14vh;
+  }
+
+  .welcomeContent h1 {
+    margin-bottom: 22px;
+    font-size: 32px;
+  }
+}
