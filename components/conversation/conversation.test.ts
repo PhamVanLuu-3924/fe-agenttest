@@ -229,5 +229,3 @@ test("Test 9: InsightResult - Phần giới hạn kết luận luôn hiển th�
   const warningLabel = "Insight · Cảnh báo / Độ tin cậy thấp";
   assert.ok(warningLabel.includes("Cảnh báo"), "Nhãn cảnh báo phải có chữ cảnh báo rõ ràng");
 });
-
-

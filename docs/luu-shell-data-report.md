@@ -1,7 +1,7 @@
 # Báo cáo phần việc của Lưu
 
-**Nhánh:** `feature/luu-shell-data`  
-**Nhánh đích của PR:** `develop`  
+**Nhánh:** `feature/luu-shell-data`
+**Nhánh đích của PR:** `develop`
 **Phạm vi:** Shell, auth, responsive và kết quả dữ liệu mock. API A00–A03 và phần dữ liệu A10 chỉ được dùng làm định hướng adapter tương lai; chưa kết nối backend.
 
 ## Đã hoàn thành
